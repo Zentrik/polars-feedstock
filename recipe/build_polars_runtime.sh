@@ -62,30 +62,41 @@ fi
 
 $PYTHON -m pip install . -vv
 
-debug_dir="${PREFIX}/share/${PKG_NAME}/debug"
-mkdir -p "${debug_dir}"
-echo "Debug artifacts for ${PKG_NAME}" > "${debug_dir}/README.txt"
+runtime_variant="${PKG_NAME#polars-runtime-}"
+ext_path="${SP_DIR}/_polars_runtime_${runtime_variant}/_polars_runtime.abi3.so"
 
 if [[ "${target_platform}" == linux-* ]]; then
-  ext_path="$(find "${SP_DIR}" -maxdepth 2 -type f -name '_polars_runtime*.so' | head -n 1 || true)"
-  objcopy_bin="${HOST}-objcopy"
-  strip_bin="${HOST}-strip"
+  objcopy_bin="${OBJCOPY:-${HOST}-objcopy}"
   command -v "${objcopy_bin}" >/dev/null 2>&1 || objcopy_bin="objcopy"
-  command -v "${strip_bin}" >/dev/null 2>&1 || strip_bin="strip"
-  if [[ -n "${ext_path}" && -n "${objcopy_bin}" ]]; then
-    command -v "${objcopy_bin}" >/dev/null 2>&1
-    command -v "${strip_bin}" >/dev/null 2>&1
-    debug_file="${debug_dir}/$(basename "${ext_path}").debug"
-    "${objcopy_bin}" --only-keep-debug "${ext_path}" "${debug_file}"
-    "${strip_bin}" --strip-unneeded "${ext_path}"
-    "${objcopy_bin}" --add-gnu-debuglink="${debug_file}" "${ext_path}"
+  if [[ ! -f "${ext_path}" ]]; then
+    echo "could not find built _polars_runtime shared object at ${ext_path}" >&2
+    exit 1
   fi
+  command -v "${objcopy_bin}" >/dev/null 2>&1 || {
+    echo "objcopy not found for split debug packaging" >&2
+    exit 1
+  }
+  rel_ext_path="${ext_path#${PREFIX}/}"
+  debug_file="${PREFIX}/lib/debug/${rel_ext_path}.debug"
+  mkdir -p "$(dirname "${debug_file}")"
+  "${objcopy_bin}" --only-keep-debug "${ext_path}" "${debug_file}"
+  chmod 664 "${debug_file}"
+  "${objcopy_bin}" --strip-debug "${ext_path}"
+  "${objcopy_bin}" --add-gnu-debuglink="${debug_file}" "${ext_path}"
 elif [[ "${target_platform}" == osx-* ]]; then
-  ext_path="$(find "${SP_DIR}" -maxdepth 2 -type f -name '_polars_runtime*.so' | head -n 1 || true)"
-  if [[ -n "${ext_path}" ]] && command -v dsymutil >/dev/null 2>&1; then
-    dsymutil "${ext_path}" -o "${debug_dir}/$(basename "${ext_path}").dSYM" || true
-    strip -x "${ext_path}" || true
+  debug_dir="${PREFIX}/share/${PKG_NAME}/debug"
+  mkdir -p "${debug_dir}"
+  echo "Debug artifacts for ${PKG_NAME}" > "${debug_dir}/README.txt"
+  if [[ ! -f "${ext_path}" ]]; then
+    echo "could not find built _polars_runtime shared object at ${ext_path}" >&2
+    exit 1
   fi
+  command -v dsymutil >/dev/null 2>&1 || {
+    echo "dsymutil not found for split debug packaging" >&2
+    exit 1
+  }
+  dsymutil "${ext_path}" -o "${debug_dir}/$(basename "${ext_path}").dSYM"
+  strip -x "${ext_path}"
 fi
 
 # The root level Cargo.toml is part of an incomplete workspace

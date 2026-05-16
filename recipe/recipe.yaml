@@ -100,30 +100,37 @@ outputs:
       name: polars-runtime-${{ polars_runtime }}-debug
     build:
       skip: not (match(python, python_min ~ ".*") and is_abi3)
+      dynamic_linking:
+        binary_relocation: false
       files:
-        - share/polars-runtime-${{ polars_runtime }}/debug/**
+        - if: linux
+          then:
+            - lib/debug/site-packages/_polars_runtime_${{ polars_runtime }}/_polars_runtime.abi3.so.debug
+        - if: osx
+          then:
+            - share/polars-runtime-${{ polars_runtime }}/debug/_polars_runtime.abi3.so.dSYM/**
+        - if: win
+          then:
+            - share/polars-runtime-${{ polars_runtime }}/debug/_polars_runtime.pdb
     requirements:
       run:
         - polars-runtime-${{ polars_runtime }} ==${{ version }}
     tests:
-      - package_contents:
-          files:
-            - share/polars-runtime-${{ polars_runtime }}/debug/*
       - if: linux
         then:
           - package_contents:
               files:
-                - share/polars-runtime-${{ polars_runtime }}/debug/*.debug
+                - lib/debug/site-packages/_polars_runtime_${{ polars_runtime }}/_polars_runtime.abi3.so.debug
       - if: osx
         then:
           - package_contents:
               files:
-                - share/polars-runtime-${{ polars_runtime }}/debug/*.dSYM/**
+                - share/polars-runtime-${{ polars_runtime }}/debug/_polars_runtime.abi3.so.dSYM/**
       - if: win
         then:
           - package_contents:
               files:
-                - share/polars-runtime-${{ polars_runtime }}/debug/*.pdb
+                - share/polars-runtime-${{ polars_runtime }}/debug/_polars_runtime.pdb
     about:
       summary: Debug symbols for polars-runtime-${{ polars_runtime }}
 

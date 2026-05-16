@@ -52,12 +52,24 @@ if %ERRORLEVEL% neq 0 exit %ERRORLEVEL%
 %PYTHON% -m pip install --find-links=target\wheels %PKG_NAME%
 if %ERRORLEVEL% neq 0 exit %ERRORLEVEL%
 
+set "RUNTIME_VARIANT=%PKG_NAME:polars-runtime-=%"
+set "EXT_PATH=%SP_DIR%\_polars_runtime_%RUNTIME_VARIANT%\_polars_runtime.pyd"
+set "PDB_PATH=%SP_DIR%\_polars_runtime_%RUNTIME_VARIANT%\_polars_runtime.pdb"
 set DEBUG_DIR=%PREFIX%\share\%PKG_NAME%\debug
 if not exist "%DEBUG_DIR%" mkdir "%DEBUG_DIR%"
 if %ERRORLEVEL% neq 0 exit %ERRORLEVEL%
 echo Debug artifacts for %PKG_NAME%> %DEBUG_DIR%\README.txt
 
-for /r target %%F in (*.pdb) do copy "%%F" "%DEBUG_DIR%\"
+if not exist "%EXT_PATH%" (
+    echo could not find built _polars_runtime extension at %EXT_PATH% 1>&2
+    exit 1
+)
+if not exist "%PDB_PATH%" (
+    echo could not find built _polars_runtime PDB at %PDB_PATH% 1>&2
+    exit 1
+)
+copy "%PDB_PATH%" "%DEBUG_DIR%\_polars_runtime.pdb"
+if %ERRORLEVEL% neq 0 exit %ERRORLEVEL%
 
 cd .\py-polars\runtime
 cargo-bundle-licenses --format yaml --output ..\..\THIRDPARTY.yml
