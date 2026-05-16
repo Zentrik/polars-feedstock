@@ -10,6 +10,7 @@ cp ${RECIPE_DIR}/cargo-auditable-wrapper.sh ${BUILD_PREFIX}/bin/cargo-auditable-
 export CARGO="cargo-auditable-wrapper"
 export CARGO_PROFILE_RELEASE_STRIP=none
 export CARGO_PROFILE_RELEASE_DEBUG=full
+export MATURIN_PEP517_ARGS="--compression-enable-large-file-support ${MATURIN_PEP517_ARGS:-}"
 
 # see https://github.com/pola-rs/polars/blob/main/.github/workflows/release-python.yml
 COMPAT_TUNE_CPU=''
