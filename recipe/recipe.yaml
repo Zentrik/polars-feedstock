@@ -34,7 +34,7 @@ source:
         - 0001-bump-rustls-webpki.patch
 
 build:
-  number: 1
+  number: 2
 
 outputs:
   - package:
@@ -65,6 +65,9 @@ outputs:
         - if: unix
           then:
             - make
+        - if: linux
+          then:
+            - binutils
         - cargo-bundle-licenses
       host:
         - python
@@ -92,6 +95,37 @@ outputs:
       license_file:
         - polars-runtime-${{ polars_runtime }}/LICENSE
         - polars-runtime-${{ polars_runtime }}/THIRDPARTY.yml
+
+  - package:
+      name: polars-runtime-${{ polars_runtime }}-debug
+    build:
+      skip: not (match(python, python_min ~ ".*") and is_abi3)
+      files:
+        - share/polars-runtime-${{ polars_runtime }}/debug/**
+    requirements:
+      run:
+        - polars-runtime-${{ polars_runtime }} ==${{ version }}
+    tests:
+      - package_contents:
+          files:
+            - share/polars-runtime-${{ polars_runtime }}/debug/*
+      - if: linux
+        then:
+          - package_contents:
+              files:
+                - share/polars-runtime-${{ polars_runtime }}/debug/*.debug
+      - if: osx
+        then:
+          - package_contents:
+              files:
+                - share/polars-runtime-${{ polars_runtime }}/debug/*.dSYM/**
+      - if: win
+        then:
+          - package_contents:
+              files:
+                - share/polars-runtime-${{ polars_runtime }}/debug/*.pdb
+    about:
+      summary: Debug symbols for polars-runtime-${{ polars_runtime }}
 
   - package:
       name: polars

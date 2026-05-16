@@ -9,6 +9,8 @@ if %ERRORLEVEL% neq 0 exit 1
 copy %RECIPE_DIR%\cargo-auditable-wrapper.bat %BUILD_PREFIX%\Library\bin\cargo-auditable-wrapper.bat
 if %ERRORLEVEL% neq 0 exit 1
 set "CARGO=cargo-auditable-wrapper.bat"
+set CARGO_PROFILE_RELEASE_STRIP=none
+set CARGO_PROFILE_RELEASE_DEBUG=full
 
 rem see https://github.com/pola-rs/polars/blob/main/.github/workflows/release-python.yml
 set COMPAT_TUNE_CPU=
@@ -49,6 +51,13 @@ maturin build --release
 if %ERRORLEVEL% neq 0 exit %ERRORLEVEL%
 %PYTHON% -m pip install --find-links=target\wheels %PKG_NAME%
 if %ERRORLEVEL% neq 0 exit %ERRORLEVEL%
+
+set DEBUG_DIR=%PREFIX%\share\%PKG_NAME%\debug
+if not exist "%DEBUG_DIR%" mkdir "%DEBUG_DIR%"
+if %ERRORLEVEL% neq 0 exit %ERRORLEVEL%
+echo Debug artifacts for %PKG_NAME%> %DEBUG_DIR%\README.txt
+
+for /r target %%F in (*.pdb) do copy "%%F" "%DEBUG_DIR%\"
 
 cd .\py-polars\runtime
 cargo-bundle-licenses --format yaml --output ..\..\THIRDPARTY.yml

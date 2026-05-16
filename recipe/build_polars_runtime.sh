@@ -8,7 +8,8 @@ cd $PKG_NAME
 mkdir -p ${BUILD_PREFIX}/bin
 cp ${RECIPE_DIR}/cargo-auditable-wrapper.sh ${BUILD_PREFIX}/bin/cargo-auditable-wrapper
 export CARGO="cargo-auditable-wrapper"
-export CARGO_PROFILE_RELEASE_STRIP=symbols
+export CARGO_PROFILE_RELEASE_STRIP=none
+export CARGO_PROFILE_RELEASE_DEBUG=full
 
 # see https://github.com/pola-rs/polars/blob/main/.github/workflows/release-python.yml
 COMPAT_TUNE_CPU=''
@@ -60,6 +61,32 @@ if [[ $target_platform == "linux-aarch64" ]]; then
 fi
 
 $PYTHON -m pip install . -vv
+
+debug_dir="${PREFIX}/share/${PKG_NAME}/debug"
+mkdir -p "${debug_dir}"
+echo "Debug artifacts for ${PKG_NAME}" > "${debug_dir}/README.txt"
+
+if [[ "${target_platform}" == linux-* ]]; then
+  ext_path="$(find "${SP_DIR}" -maxdepth 2 -type f -name '_polars_runtime*.so' | head -n 1 || true)"
+  objcopy_bin="${HOST}-objcopy"
+  strip_bin="${HOST}-strip"
+  command -v "${objcopy_bin}" >/dev/null 2>&1 || objcopy_bin="objcopy"
+  command -v "${strip_bin}" >/dev/null 2>&1 || strip_bin="strip"
+  if [[ -n "${ext_path}" && -n "${objcopy_bin}" ]]; then
+    command -v "${objcopy_bin}" >/dev/null 2>&1
+    command -v "${strip_bin}" >/dev/null 2>&1
+    debug_file="${debug_dir}/$(basename "${ext_path}").debug"
+    "${objcopy_bin}" --only-keep-debug "${ext_path}" "${debug_file}"
+    "${strip_bin}" --strip-unneeded "${ext_path}"
+    "${objcopy_bin}" --add-gnu-debuglink="${debug_file}" "${ext_path}"
+  fi
+elif [[ "${target_platform}" == osx-* ]]; then
+  ext_path="$(find "${SP_DIR}" -maxdepth 2 -type f -name '_polars_runtime*.so' | head -n 1 || true)"
+  if [[ -n "${ext_path}" ]] && command -v dsymutil >/dev/null 2>&1; then
+    dsymutil "${ext_path}" -o "${debug_dir}/$(basename "${ext_path}").dSYM" || true
+    strip -x "${ext_path}" || true
+  fi
+fi
 
 # The root level Cargo.toml is part of an incomplete workspace
 # we need to use the manifest inside the py-polars
